@@ -37,14 +37,20 @@ export const userStats = sqliteTable("user_stats", {
 
 // Add the explicit mapping for 'tags' to resolve the SyntaxError
 export const insertContentItemSchema = createInsertSchema(contentItems, {
-  tags: z.string().optional(), // Tells Zod to expect a string, resolving the JSONB mismatch
+  // 1. Keep the tags as string for SQLite
+  tags: z.string().optional(),
+  // 2. Add coercion for dateCompleted to handle JSON string -> Date object
+  dateCompleted: z.coerce.date().optional().nullable(),
 }).omit({
   id: true,
   dateAdded: true,
   timesSurfaced: true,
 });
 
-export const insertUserStatsSchema = createInsertSchema(userStats).omit({
+export const insertUserStatsSchema = createInsertSchema(userStats, {
+  // 3. Proactively add coercion here too for consistency
+  lastActiveDate: z.coerce.date().optional().nullable(),
+}).omit({
   id: true,
 });
 

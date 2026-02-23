@@ -27,14 +27,11 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   async getContentItems(focus?: 'low' | 'medium' | 'high'): Promise<ContentItem[]> {
-    // For MVP, if focus is provided, filter. Otherwise, return all unseen/in_progress
-    // Let's just return all non-completed for now, sorted by dateAdded
-    // Real implementation might map focus 'low' -> 'light', 'medium' -> 'medium', 'high' -> 'deep'
     const allItems = await db.select().from(contentItems).orderBy(desc(contentItems.dateAdded));
     let filtered = allItems.filter(item => item.status !== 'completed');
     
     if (focus) {
-      const difficultyMap = {
+      const difficultyMap: Record<string, string> = {
         'low': 'light',
         'medium': 'medium',
         'high': 'deep'
@@ -52,49 +49,70 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createContentItem(item: InsertContentItem): Promise<ContentItem> {
-    const [created] = await db.insert(contentItems).values(item).returning();
+    // 1. Insert the data using .run()
+    const result = await db.insert(contentItems).values(item).run();
+    // 2. Get the auto-incremented ID
+    const id = Number(result.lastInsertRowid);
+    // 3. Fetch and return the new row
+    const [created] = await db.select().from(contentItems).where(eq(contentItems.id, id));
+    if (!created) throw new Error("Failed to create content item");
     return created;
   }
 
   async updateContentItem(id: number, updates: UpdateContentRequest): Promise<ContentItem> {
-    const [updated] = await db.update(contentItems)
+    // 1. Perform the update
+    await db.update(contentItems)
       .set(updates)
       .where(eq(contentItems.id, id))
-      .returning();
+      .run();
+    // 2. Fetch and return the updated row
+    const [updated] = await db.select().from(contentItems).where(eq(contentItems.id, id));
+    if (!updated) throw new Error("Item not found after update");
     return updated;
   }
 
   async deleteContentItem(id: number): Promise<void> {
-    await db.delete(contentItems).where(eq(contentItems.id, id));
+    await db.delete(contentItems).where(eq(contentItems.id, id)).run();
   }
 
   async incrementSurfaced(id: number): Promise<ContentItem> {
     const item = await this.getContentItem(id);
     if (!item) throw new Error("Item not found");
-    const [updated] = await db.update(contentItems)
+    
+    await db.update(contentItems)
       .set({ timesSurfaced: item.timesSurfaced + 1 })
       .where(eq(contentItems.id, id))
-      .returning();
+      .run();
+      
+    const [updated] = await db.select().from(contentItems).where(eq(contentItems.id, id));
+    if (!updated) throw new Error("Item not found after increment");
     return updated;
   }
 
   async getUserStats(): Promise<UserStats> {
     let [stats] = await db.select().from(userStats).where(eq(userStats.id, 1));
     if (!stats) {
-      // Create initial stats row
-      [stats] = await db.insert(userStats).values({}).returning();
+      // Create initial stats row if it doesn't exist
+      const result = await db.insert(userStats).values({}).run();
+      const id = Number(result.lastInsertRowid);
+      [stats] = await db.select().from(userStats).where(eq(userStats.id, id));
     }
     return stats;
   }
 
   async updateUserStats(updates: UpdateUserStatsRequest): Promise<UserStats> {
     const stats = await this.getUserStats();
-    const [updated] = await db.update(userStats)
+    await db.update(userStats)
       .set(updates)
       .where(eq(userStats.id, stats.id))
-      .returning();
+      .run();
+      
+    const [updated] = await db.select().from(userStats).where(eq(userStats.id, stats.id));
+    if (!updated) throw new Error("Stats not found after update");
     return updated;
   }
 }
 
-export const storage = new DatabaseStorage();
+// At the very bottom of storage.ts
+const storage = new DatabaseStorage();
+export { storage };

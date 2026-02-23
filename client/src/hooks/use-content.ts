@@ -82,6 +82,7 @@ export function useMarkSurfaced() {
 }
 
 // POST /api/content/detect
+/*
 export function useDetectUrl() {
   return useMutation({
     mutationFn: async (url: string) => {
@@ -94,6 +95,20 @@ export function useDetectUrl() {
       });
       if (!res.ok) throw new Error('Failed to detect URL metadata');
       return api.content.detect.responses[200].parse(await res.json());
+    },
+  });
+}
+*/
+export function useDetectUrl() {
+  return useMutation({
+    mutationFn: async (url: string) => {
+      const res = await fetch("/api/content/detect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      if (!res.ok) throw new Error("Detection failed");
+      return res.json();
     },
   });
 }

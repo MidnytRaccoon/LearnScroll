@@ -22,27 +22,31 @@ export function AddContentModal({ isOpen, onClose }: AddContentModalProps) {
     });
   };
 
-  const handleSave = () => {
-    const payload = {
-      url,
-      title: detectedData?.title || "Untitled Link",
-      type: detectedData?.type || "article",
-      thumbnailUrl: detectedData?.thumbnailUrl,
-      author: detectedData?.author,
-      platformName: detectedData?.platformName,
-      estimatedMinutes: detectedData?.estimatedMinutes || 5,
-      difficulty: "medium", // Default
-      status: "unseen"
-    };
+// client/src/components/forms/AddContentModal.tsx
 
-    createMutation.mutate(payload, {
-      onSuccess: () => {
-        setUrl("");
-        setDetectedData(null);
-        onClose();
-      }
-    });
+const handleSave = () => {
+  const payload = {
+    url,
+    title: detectedData?.title || "Untitled Link",
+    type: detectedData?.type || "article",
+    thumbnailUrl: detectedData?.thumbnailUrl,
+    author: detectedData?.author,
+    platformName: detectedData?.platformName,
+    estimatedMinutes: detectedData?.estimatedMinutes || 5,
+    difficulty: "medium",
+    status: "unseen",
+    // CRITICAL: Stringify the tags so SQLite can store them
+    tags: JSON.stringify(detectedData?.tags || []), 
   };
+
+  createMutation.mutate(payload, {
+    onSuccess: () => {
+      setUrl("");
+      setDetectedData(null);
+      onClose();
+    }
+  });
+};
 
   if (!isOpen) return null;
 
