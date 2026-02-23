@@ -1,0 +1,70 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-sans: 'Inter', sans-serif;
+    --font-display: 'Outfit', sans-serif;
+
+    /* Deep Navy / Indigo Theme - Forced Dark Mode aesthetics */
+    --background: 222 47% 11%; /* slate-900 */
+    --foreground: 210 40% 98%; /* slate-50 */
+    
+    --card: 217 33% 17%; /* slate-800 */
+    --card-foreground: 210 40% 98%;
+    
+    --popover: 217 33% 17%;
+    --popover-foreground: 210 40% 98%;
+    
+    --primary: 243 75% 59%; /* indigo-600 */
+    --primary-foreground: 210 40% 98%;
+    
+    --secondary: 215 25% 27%; /* slate-700 */
+    --secondary-foreground: 210 40% 98%;
+    
+    --muted: 215 25% 27%;
+    --muted-foreground: 215 16% 65%; /* slate-400 */
+    
+    --accent: 316 73% 52%; /* fuchsia-500 */
+    --accent-foreground: 210 40% 98%;
+    
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 215 25% 27%;
+    --input: 215 25% 27%;
+    --ring: 243 75% 59%;
+
+    --radius: 1rem;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+    /* Prevent overscroll bounce on mobile to feel more like a native app */
+    overscroll-behavior-y: none;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    @apply tracking-tight;
+  }
+}
+
+@layer utilities {
+  /* Hide scrollbar for cleaner feed look */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .glass-panel {
+    @apply bg-background/60 backdrop-blur-xl border border-white/10;
+  }
+}
