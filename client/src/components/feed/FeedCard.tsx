@@ -1,13 +1,10 @@
+// client/src/components/feed/FeedCard.tsx
 import { useEffect } from "react";
 import { useInView } from "react-intersection-observer";
-import { Play, Clock, BookOpen, Edit2 } from "lucide-react";
+import { Play, Clock, BookOpen, Edit2, Trash2, Loader2, ArrowBigUp, ArrowBigDown } from "lucide-react";
 import type { ContentItem } from "@shared/schema";
-import { useMarkSurfaced } from "@/hooks/use-content";
-
-{/* 
-  Dynamic images rule: we use thumbnailUrl from API if exists.
-  If not, we use a beautiful gradient placeholder. 
-*/}
+import { useMarkSurfaced, useDeleteContent } from "@/hooks/use-content";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface FeedCardProps {
   item: ContentItem;
@@ -16,12 +13,32 @@ interface FeedCardProps {
 }
 
 export function FeedCard({ item, onPlay, onEdit }: FeedCardProps) {
-  const { ref, inView } = useInView({
-    threshold: 0.6, // Trigger when 60% visible
-    triggerOnce: true, // Only mark once per mount
+  const queryClient = useQueryClient();
+  const deleteMutation = useDeleteContent();
+  const markSurfaced = useMarkSurfaced();
+
+  // PRIORITIZE: Manual Display Image > Auto-Extracted Thumbnail
+  const displayImg = item.displayImageUrl || item.thumbnailUrl;
+
+  const rateMutation = useMutation({
+    mutationFn: async (delta: number) => {
+      const res = await fetch(`/api/content/${item.id}/rate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ delta }),
+      });
+      if (!res.ok) throw new Error("Failed to update priority");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+    }
   });
 
-  const markSurfaced = useMarkSurfaced();
+  const { ref, inView } = useInView({
+    threshold: 0.3,
+    triggerOnce: true,
+  });
 
   useEffect(() => {
     if (inView) {
@@ -29,86 +46,98 @@ export function FeedCard({ item, onPlay, onEdit }: FeedCardProps) {
     }
   }, [inView, item.id]);
 
+  const handleDelete = () => {
+    if (confirm("Are you sure you want to delete this dopamine hit?")) {
+      deleteMutation.mutate(item.id);
+    }
+  };
+
   const isVideo = item.type === 'youtube' || item.type === 'tiktok' || item.type === 'video';
 
   return (
     <div 
       ref={ref} 
-      className="w-full h-screen snap-start relative flex flex-col justify-end p-4 sm:p-6"
+      className="bg-card border border-white/10 rounded-3xl overflow-hidden shadow-xl transition-all hover:border-white/20"
     >
-      {/* Background Media/Image */}
-      <div className="absolute inset-0 z-0 bg-background overflow-hidden">
-        {item.thumbnailUrl ? (
-          <img 
-            src={item.thumbnailUrl} 
-            alt={item.title}
-            className="w-full h-full object-cover opacity-70 scale-105"
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-indigo-900 via-slate-900 to-black" />
-        )}
-        {/* Dark gradient fade for text readability */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
-      </div>
-
-      {/* Edit Button - Bottom Left */}
-      <button 
-        onClick={() => onEdit(item)}
-        className="absolute bottom-24 left-6 z-20 w-12 h-12 bg-black/20 backdrop-blur-md border border-white/10 rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-all active:scale-90"
-      >
-        <Edit2 className="w-5 h-5" />
-      </button>
-
-      {/* Content Info */}
-      <div className="relative z-10 w-full max-w-2xl mx-auto pb-24 sm:pb-20">
-        
-        {/* Badges */}
-        <div className="flex items-center gap-2 mb-4">
-          <div className="bg-white/10 backdrop-blur-md text-white px-3 py-1 rounded-full text-xs font-semibold capitalize flex items-center gap-1.5 border border-white/10">
-            {isVideo ? <Play className="w-3 h-3" /> : <BookOpen className="w-3 h-3" />}
-            {item.type}
+      {/* 1. Header: Source & Options */}
+      <div className="p-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+            {isVideo ? <Play className="w-5 h-5" /> : <BookOpen className="w-5 h-5" />}
           </div>
-          {item.estimatedMinutes && (
-            <div className="bg-black/40 backdrop-blur-md text-white/80 px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1.5">
-              <Clock className="w-3 h-3" />
-              {item.estimatedMinutes}m
-            </div>
-          )}
-          <div className={`px-3 py-1 rounded-full text-xs font-semibold capitalize border ${
-            item.difficulty === 'deep' || item.difficulty === 'high' ? 'bg-rose-500/20 text-rose-300 border-rose-500/30' :
-            item.difficulty === 'medium' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' :
-            'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-          }`}>
-            {item.difficulty || 'light'}
+          <div>
+            <p className="font-bold text-sm text-white leading-tight">
+              {item.author || item.platformName || "Discovery Source"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+               {item.estimatedMinutes}m • {item.difficulty || 'light'}
+            </p>
           </div>
         </div>
+        
+        <div className="flex gap-1">
+          <button onClick={() => onEdit(item)} className="p-2 text-muted-foreground hover:text-white transition-colors">
+            <Edit2 className="w-4 h-4" />
+          </button>
+          <button onClick={handleDelete} disabled={deleteMutation.isPending} className="p-2 text-muted-foreground hover:text-red-400 transition-colors">
+            {deleteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+          </button>
+        </div>
+      </div>
 
-        {/* Title & Author */}
-        <h2 className="text-3xl sm:text-4xl font-display font-bold text-white mb-2 leading-tight">
+      {/* 2. Media Section (Updated to use displayImg) */}
+      <div 
+        onClick={() => onPlay(item)}
+        className="relative aspect-video bg-slate-900 cursor-pointer group overflow-hidden"
+      >
+        {displayImg ? (
+          <img 
+            src={displayImg} 
+            alt={item.title}
+            className="w-full h-full object-cover transition-transform group-hover:scale-105"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-indigo-900 to-black flex items-center justify-center">
+             <span className="text-white/20 font-display font-bold text-4xl">LEARN</span>
+          </div>
+        )}
+        
+        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+            <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center scale-90 group-hover:scale-100 transition-transform">
+                <Play className="w-6 h-6 text-white fill-current" />
+            </div>
+        </div>
+      </div>
+
+      {/* 3. Footer: Text, Votes & CTA */}
+      <div className="p-5">
+        <h3 className="text-xl font-display font-bold text-white mb-4 leading-tight line-clamp-2">
           {item.title}
-        </h2>
-        <p className="text-slate-300 text-sm sm:text-base mb-6">
-          {item.author || item.platformName || "Unknown Source"}
-        </p>
+        </h3>
+        
+        <div className="flex items-center justify-between pt-4 border-t border-white/5">
+           <div className="flex items-center gap-4">
+              <div className="flex items-center gap-1 bg-secondary/30 rounded-full px-2 py-1 border border-white/5">
+                <button onClick={() => rateMutation.mutate(1)} className="p-1 hover:text-orange-500 transition-colors">
+                  <ArrowBigUp className={`w-5 h-5 ${item.priority > 0 ? 'fill-orange-500 text-orange-500' : ''}`} />
+                </button>
+                <span className="text-sm font-bold min-w-[1.2rem] text-center">{item.priority}</span>
+                <button onClick={() => rateMutation.mutate(-1)} className="p-1 hover:text-indigo-400 transition-colors">
+                  <ArrowBigDown className={`w-5 h-5 ${item.priority < 0 ? 'fill-indigo-500 text-indigo-500' : ''}`} />
+                </button>
+              </div>
+              <span className="px-2.5 py-1 rounded-md bg-secondary text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                {item.type}
+              </span>
+           </div>
 
-        {/* Action Button */}
-        <button
-          onClick={() => onPlay(item)}
-          className="w-full sm:w-auto px-8 py-4 bg-white text-black rounded-2xl font-bold text-lg hover:scale-105 active:scale-95 transition-transform flex items-center justify-center gap-3 shadow-xl"
-        >
-          {isVideo ? (
-            <>
-              <Play className="w-5 h-5 fill-current" />
-              Start Watching
-            </>
-          ) : (
-            <>
-              <BookOpen className="w-5 h-5" />
-              Start Reading
-            </>
-          )}
-        </button>
-
+           <button
+             onClick={() => onPlay(item)}
+             className="px-6 py-2.5 bg-white text-black rounded-xl font-bold text-sm hover:bg-slate-200 transition-colors shadow-lg"
+           >
+             {isVideo ? "Watch Now" : "Read Now"}
+           </button>
+        </div>
       </div>
     </div>
   );

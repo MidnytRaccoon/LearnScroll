@@ -2,15 +2,22 @@ import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core"; // Switch 
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+
+
 export const contentItems = sqliteTable("content_items", {
   id: integer("id").primaryKey({ autoIncrement: true }), // SQLite uses integer primary keys
   title: text("title").notNull(),
   type: text("type").notNull(), 
   url: text("url"),
   localPath: text("local_path"),
-  thumbnailUrl: text("thumbnail_url"),
+  thumbnailUrl: text("thumbnail_url"), // Original auto-extracted thumb
+  displayImageUrl: text("display_image_url"), // Our new manual override field
   estimatedMinutes: integer("estimated_minutes"),
   difficulty: text("difficulty"), 
+
+  contentBody: text("content_body"), // For your 10k character rich text
+  lastEdited: integer("last_edited", { mode: 'timestamp' }), // Tracking the MM/DD/YYYY - HH:mm
+
   // SQLite doesn't have native JSONB. We store it as a string and parse/stringify.
   tags: text("tags"), 
   status: text("status").notNull().default("unseen"), 
@@ -19,11 +26,13 @@ export const contentItems = sqliteTable("content_items", {
   dateAdded: integer("date_added", { mode: 'timestamp' }).notNull().default(new Date()),
   dateCompleted: integer("date_completed", { mode: 'timestamp' }),
   userNote: text("user_note"),
-  priority: integer("priority").notNull().default(3), 
+  priority: integer("priority").notNull().default(0), // Change default to 0 for a neutral starting point
   timesSurfaced: integer("times_surfaced").notNull().default(0),
   platformName: text("platform_name"),
   author: text("author"),
 });
+
+
 
 export const userStats = sqliteTable("user_stats", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -37,10 +46,10 @@ export const userStats = sqliteTable("user_stats", {
 
 // Add the explicit mapping for 'tags' to resolve the SyntaxError
 export const insertContentItemSchema = createInsertSchema(contentItems, {
-  // 1. Keep the tags as string for SQLite
   tags: z.string().optional(),
-  // 2. Add coercion for dateCompleted to handle JSON string -> Date object
   dateCompleted: z.coerce.date().optional().nullable(),
+  contentBody: z.string().max(10000).optional(),
+  displayImageUrl: z.string().url().optional().or(z.literal("")), // <-- ADD THIS
 }).omit({
   id: true,
   dateAdded: true,
@@ -53,6 +62,16 @@ export const insertUserStatsSchema = createInsertSchema(userStats, {
 }).omit({
   id: true,
 });
+
+
+
+
+// Add these exports to the bottom of schema.ts
+export const updateContentSchema = insertContentItemSchema.partial();
+export const updateUserStatsSchema = insertUserStatsSchema.partial();
+
+export type UpdateContentRequest = z.infer<typeof updateContentSchema>;
+export type UpdateUserStatsRequest = z.infer<typeof updateUserStatsSchema>;
 
 // Types remain the same
 export type ContentItem = typeof contentItems.$inferSelect;

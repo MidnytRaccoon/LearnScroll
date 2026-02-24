@@ -1,97 +1,161 @@
+// client/src/components/feed/ContentPlayer.tsx
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ExternalLink, CheckCircle } from "lucide-react";
-import ReactPlayer from "react-player";
-import type { ContentItem } from "@shared/routes";
+import { X, CheckCircle, Edit3, Save, RotateCcw, FileText, ExternalLink, Loader2 } from "lucide-react";
+import { useUpdateContent } from "@/hooks/use-content";
+import type { ContentItem } from "@shared/schema";
 
+// Add this above your export function
 interface ContentPlayerProps {
   item: ContentItem | null;
   isOpen: boolean;
   onClose: () => void;
   onComplete: (item: ContentItem) => void;
+  onSaveSuccess?: () => void; // Add this new prop
 }
 
-export function ContentPlayer({ item, isOpen, onClose, onComplete }: ContentPlayerProps) {
-  if (!isOpen || !item) return null;
+export function ContentPlayer({ item, isOpen, onClose, onComplete, onSaveSuccess }: ContentPlayerProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState<Partial<ContentItem>>({});
+  const updateMutation = useUpdateContent();
 
-  const isVideo = item.type === 'youtube' || item.type === 'tiktok' || item.type === 'video';
-  const isArticle = item.type === 'article' || item.type === 'manual';
+  useEffect(() => {
+    if (item) setEditData({ title: item.title, url: item.url || "", contentBody: item.contentBody || "" });
+  }, [item]);
+
+  if (!item) return null;
+
+  const handleCancel = () => {
+    if (item) {
+      // Revert local state to the original item data
+      setEditData({
+        title: item.title || "",
+        url: item.url || "",
+        contentBody: item.contentBody || ""
+      });
+    }
+    setIsEditing(false);
+  };
+
+const handleSave = () => {
+    const payload = {
+      id: item.id,
+      title: editData.title,
+      url: editData.url,
+      contentBody: editData.contentBody || "",
+    };
+
+    updateMutation.mutate(payload, { 
+      onSuccess: () => {
+        setIsEditing(false);
+        // If the callback exists, trigger the "reopen" cycle in the parent
+        if (onSaveSuccess) onSaveSuccess();
+      }
+    });
+  };
+
+  const formatDateTime = (date: Date | null) => {
+    if (!date) return "Never";
+    const d = new Date(date);
+    return d.toLocaleDateString('en-US') + " - " + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  };
 
   return (
     <AnimatePresence>
-      <motion.div
-        initial={{ y: "100%" }}
-        animate={{ y: 0 }}
-        exit={{ y: "100%" }}
-        transition={{ type: "spring", damping: 25, stiffness: 200 }}
-        className="fixed inset-0 z-[90] bg-background flex flex-col"
-      >
-        <div className="flex items-center justify-between p-4 border-b border-white/5 bg-card">
-          <div className="flex-1 min-w-0 pr-4">
-            <h3 className="font-display font-bold text-lg text-white truncate">
-              {item.title}
-            </h3>
-            <p className="text-sm text-muted-foreground truncate">{item.author || item.platformName}</p>
-          </div>
-          <button 
-            onClick={onClose}
-            className="w-10 h-10 bg-secondary rounded-full flex items-center justify-center text-white shrink-0 hover:bg-secondary/80 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+      {isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 sm:p-4">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/95 backdrop-blur-xl" />
 
-        <div className="flex-1 overflow-y-auto relative bg-black">
-          {isVideo && item.url ? (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <ReactPlayer
-                url={item.url}
-                width="100%"
-                height="100%"
-                controls
-                playing
-                config={{
-                  youtube: {
-                    playerVars: { modestbranding: 1 }
-                  }
-                }}
-              />
-            </div>
-          ) : isArticle ? (
-            <div className="p-6 md:p-12 max-w-3xl mx-auto h-full flex flex-col items-center justify-center text-center">
-              {/* If we had full scraped content, we'd render it here. For MVP, we link out */}
-              <div className="w-20 h-20 bg-primary/20 text-primary rounded-2xl flex items-center justify-center mb-6">
-                <ExternalLink className="w-10 h-10" />
+          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="relative w-full max-w-4xl h-full sm:h-[85vh] bg-card sm:rounded-3xl overflow-hidden flex flex-col border border-white/10 shadow-2xl">
+            
+            {/* Header */}
+            <div className="p-4 border-b border-white/5 flex items-center justify-between bg-white/5">
+              <div className="flex-1">
+                {isEditing ? (
+                  <input value={editData.title ?? ""} onChange={e => setEditData({...editData, title: e.target.value})} className="bg-transparent text-xl font-bold text-white w-full outline-none border-b border-primary" />
+                ) : (
+                  <h3 className="font-bold text-xl text-white truncate">{item.title}</h3>
+                )}
               </div>
-              <h2 className="text-2xl font-bold mb-4">Read Article</h2>
-              <p className="text-muted-foreground mb-8">
-                This content requires reading on the original platform.
-              </p>
-              <a 
-                href={item.url || '#'} 
-                target="_blank" 
-                rel="noreferrer"
-                className="px-8 py-3 bg-white text-black font-bold rounded-full hover:bg-slate-200 transition-colors"
-              >
-                Open in New Tab
-              </a>
+              <div className="flex items-center gap-2">
+                {!isEditing && (
+                  <button onClick={() => setIsEditing(true)} className="p-2 hover:bg-white/10 rounded-lg text-primary transition-colors">
+                    <Edit3 className="w-5 h-5" />
+                  </button>
+                )}
+                <button onClick={onClose} className="p-2 hover:bg-red-500/20 rounded-lg text-white/50"><X className="w-6 h-6" /></button>
+              </div>
             </div>
-          ) : (
-            <div className="flex items-center justify-center h-full text-muted-foreground">
-              Viewer for {item.type} not supported yet.
-            </div>
-          )}
-        </div>
 
-        <div className="p-4 bg-card border-t border-white/5 safe-area-pb">
-          <button
-            onClick={() => onComplete(item)}
-            className="w-full py-4 bg-gradient-to-r from-primary to-accent text-white font-bold rounded-xl shadow-lg shadow-primary/25 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-          >
-            <CheckCircle className="w-5 h-5" />
-            Mark as Completed
-          </button>
+            {/* Scrollable Content Area */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {isEditing ? (
+        <div className="space-y-4">
+            <input 
+              placeholder="Source/PDF Link (URL or Local Path)" 
+              value={editData.url ?? ""} // Now always a string
+              onChange={e => setEditData({...editData, url: e.target.value})} 
+              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white" 
+            />
+            <textarea 
+              placeholder="Write your notes or paste rich content here..." 
+              value={editData.contentBody ?? ""} // Now always a string
+              maxLength={10000}
+              onChange={e => setEditData({...editData, contentBody: e.target.value})}
+              className="w-full h-[40vh] bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white resize-none focus:ring-1 focus:ring-primary outline-none" 
+            />
+            <p className="text-[10px] text-right text-muted-foreground">
+              {(editData.contentBody ?? "").length}/10,000
+            </p>
+          </div>
+        ) : (
+                <div className="prose prose-invert max-w-none">
+                  {/* Local PDF / Link Button */}
+                  {item.url && (
+                    <div className="flex gap-3 mb-8">
+                      <a href={item.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 px-4 py-2 bg-primary/20 border border-primary/30 rounded-lg text-primary text-sm font-bold hover:bg-primary/30 transition-all">
+                        {item.url.toLowerCase().endsWith('.pdf') ? <FileText className="w-4 h-4" /> : <ExternalLink className="w-4 h-4" />}
+                        Open Resource
+                      </a>
+                    </div>
+                  )}
+                  <div className="whitespace-pre-wrap text-slate-300 leading-relaxed">
+                    {item.contentBody || "No notes added yet. Click edit to start your learning journal."}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-white/5 bg-black/20">
+              {isEditing ? (
+                <div className="flex gap-3">
+                  <button onClick={handleCancel} className="flex-1 py-3 bg-white/5 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-white/10">
+                    <RotateCcw className="w-4 h-4" /> Cancel
+                  </button>
+                  <button 
+                    onClick={handleSave} 
+                    disabled={updateMutation.isPending}
+                    className="flex-1 py-3 bg-primary rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-primary/20 disabled:opacity-50"
+                  >
+                    {updateMutation.isPending ? ( <Loader2 className="w-4 h-4 animate-spin" />) : (<></>)}
+                    <Save className="w-4 h-4" /> Save Notes
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  <button onClick={() => onComplete(item)} className="w-full py-4 bg-white text-black font-bold rounded-xl flex items-center justify-center gap-2 hover:scale-[1.01] transition-transform">
+                    <CheckCircle className="w-5 h-5" /> Mark Completed
+                  </button>
+                  <p className="text-[10px] text-center text-muted-foreground uppercase tracking-widest">
+                    Last Edited: {formatDateTime(item.lastEdited || item.dateAdded)}
+                  </p>
+                </div>
+              )}
+            </div>
+          </motion.div>
         </div>
-      </motion.div>
+      )}
     </AnimatePresence>
   );
 }

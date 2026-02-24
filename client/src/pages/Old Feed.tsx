@@ -1,4 +1,3 @@
-// client/src/pages/Feed.tsx
 import { useState } from "react";
 import { Loader2, Inbox } from "lucide-react";
 import { Header } from "@/components/layout/Header";
@@ -9,7 +8,6 @@ import { CompletionModal } from "@/components/feed/CompletionModal";
 import { AddContentModal } from "@/components/forms/AddContentModal";
 import { EditContentModal } from "@/components/forms/EditContentModal";
 import { useFeed } from "@/hooks/use-content";
-import { Footer } from "@/components/layout/Footer"; // Import your new component
 import type { ContentItem } from "@shared/schema";
 
 type FocusLevel = 'low' | 'medium' | 'high' | undefined;
@@ -18,8 +16,12 @@ export default function Feed() {
   const [activeFocus, setActiveFocus] = useState<FocusLevel>(undefined);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  
+  // Player state
   const [activeItem, setActiveItem] = useState<ContentItem | null>(null);
   const [isPlayerOpen, setIsPlayerOpen] = useState(false);
+  
+  // Completion state
   const [isCompletionOpen, setIsCompletionOpen] = useState(false);
 
   const { data: feedItems, isLoading } = useFeed({ focus: activeFocus });
@@ -36,88 +38,71 @@ export default function Feed() {
 
   const handleComplete = (item: ContentItem) => {
     setIsPlayerOpen(false);
+    // Slight delay to allow player drawer to close smoothly before opening completion modal
     setTimeout(() => {
       setActiveItem(item);
       setIsCompletionOpen(true);
     }, 300);
   };
 
-  const handleRefreshPlayer = () => {
-  setIsPlayerOpen(false);
-  // A tiny 10ms timeout lets the component unmount and remount with fresh props
-  setTimeout(() => {
-    setIsPlayerOpen(true);
-  }, 10);
-};
-
-const currentItem = feedItems?.find(i => i.id === activeItem?.id) || activeItem;
-
   return (
-    <div className="bg-black min-h-screen text-white">
+    <div className="bg-black min-h-screen text-white overflow-hidden">
       <Header onAddClick={() => setIsAddModalOpen(true)} />
       <SubHeader activeFocus={activeFocus} onFocusChange={setActiveFocus} />
 
-      {/* New Social Feed Container: 
-          - Removed snap-y and snap-mandatory 
-          - Max width for better desktop readability 
-      */}
-      <main className="max-w-2xl mx-auto pt-32 pb-12 px-4 space-y-6">
+      {/* Main Feed Container - Snap Scrolling */}
+      <main className="h-screen w-full overflow-y-scroll snap-y snap-mandatory no-scrollbar relative">
         {isLoading ? (
-          <div className="flex items-center justify-center py-20">
+          <div className="h-full w-full flex items-center justify-center">
             <Loader2 className="w-10 h-10 animate-spin text-primary" />
           </div>
         ) : !feedItems || feedItems.length === 0 ? (
-          <div className="flex flex-col items-center justify-center px-6 py-20 text-center text-muted-foreground">
+          <div className="h-full w-full flex flex-col items-center justify-center px-6 text-center text-muted-foreground">
             <div className="w-20 h-20 bg-secondary rounded-full flex items-center justify-center mb-6">
               <Inbox className="w-10 h-10 text-slate-500" />
             </div>
             <h2 className="text-2xl font-display font-bold text-white mb-2">You're all caught up!</h2>
-            <p className="max-w-xs mb-8">
+            <p className="max-w-xs">
               Your backlog is empty. Time to add some new high-quality dopamine to your feed.
             </p>
             <button 
               onClick={() => setIsAddModalOpen(true)}
-              className="px-6 py-3 bg-primary text-white rounded-full font-bold shadow-lg shadow-primary/20"
+              className="mt-8 px-6 py-3 bg-primary text-white rounded-full font-bold shadow-lg shadow-primary/20"
             >
               Add Content
             </button>
           </div>
         ) : (
-          <>
-            {feedItems.map((item) => (
-              <FeedCard 
-                key={item.id} 
-                item={item} 
-                onPlay={handlePlay} 
-                onEdit={handleEdit}
-              />
-            ))}
-            <Footer />
-          </>
+          feedItems.map((item) => (
+            <FeedCard 
+              key={item.id} 
+              item={item} 
+              onPlay={handlePlay} 
+              onEdit={handleEdit}
+            />
+          ))
         )}
       </main>
 
-      {/* Overlays & Modals remain the same */}
-    <ContentPlayer 
-      item={currentItem} // Pass the "live" version
-      isOpen={isPlayerOpen}
-      onClose={() => {
-        setIsPlayerOpen(false);
-        setActiveItem(null); // Clear active item on close
-      }}
+      {/* Overlays & Modals */}
+      <ContentPlayer 
+        item={activeItem}
+        isOpen={isPlayerOpen}
+        onClose={() => setIsPlayerOpen(false)}
         onComplete={handleComplete}
-        // --- ADD THIS PROP HERE ---
-        onSaveSuccess={handleRefreshPlayer}
       />
+
       <CompletionModal
         item={activeItem}
         isOpen={isCompletionOpen}
         onClose={() => setIsCompletionOpen(false)}
       />
+
       <AddContentModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
       />
+
       <EditContentModal
         item={activeItem}
         isOpen={isEditModalOpen}

@@ -4,6 +4,9 @@ import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 
+
+
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -95,9 +98,28 @@ export async function registerRoutes(
   // RUN SEEDER
   await seedDatabase();
 
+  app.post("/api/content/:id/rate", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { delta } = req.body; // delta will be 1 or -1
+    const updated = await storage.updatePriority(id, delta);
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+  app.delete(api.content.delete.path, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    await storage.deleteContentItem(id);
+    res.status(204).end(); // 204 No Content is standard for successful deletion
+  } catch (err) {
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
   return httpServer;
 }
-
 async function seedDatabase() {
   const items = await storage.getContentItems();
   if (items.length === 0) {
@@ -112,3 +134,5 @@ async function seedDatabase() {
     });
   }
 }
+
+

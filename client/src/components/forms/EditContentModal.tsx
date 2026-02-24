@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Loader2, Save } from "lucide-react";
 import { useUpdateContent } from "@/hooks/use-content";
 import type { ContentItem } from "@shared/schema";
+import type { UpdateContentRequest } from "@shared/schema"; // Ensure this is imported
 
 interface EditContentModalProps {
   item: ContentItem | null;
@@ -12,14 +13,15 @@ interface EditContentModalProps {
 
 export function EditContentModal({ item, isOpen, onClose }: EditContentModalProps) {
   const updateMutation = useUpdateContent();
-  const [formData, setFormData] = useState<Partial<ContentItem>>({});
+  const [formData, setFormData] = useState<UpdateContentRequest>({});
 
-  useEffect(() => {
+useEffect(() => {
     if (item) {
       setFormData({
         title: item.title,
         url: item.url || "",
         estimatedMinutes: item.estimatedMinutes,
+        displayImageUrl: item.displayImageUrl || "", 
         difficulty: item.difficulty,
         author: item.author || "",
         platformName: item.platformName || "",
@@ -27,9 +29,11 @@ export function EditContentModal({ item, isOpen, onClose }: EditContentModalProp
     }
   }, [item]);
 
-  const handleSave = () => {
+const handleSave = () => {
     if (!item) return;
-    updateMutation.mutate({ id: item.id, data: formData }, {
+    
+    // Now the types will match perfectly!
+    updateMutation.mutate({ id: item.id, ...formData }, {
       onSuccess: () => {
         onClose();
       }
@@ -76,6 +80,30 @@ export function EditContentModal({ item, isOpen, onClose }: EditContentModalProp
                 onChange={e => setFormData({ ...formData, url: e.target.value })}
                 className="w-full bg-background border border-border rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 outline-none transition-all"
               />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">
+                Display Image URL
+              </label>
+              <div className="flex gap-4 items-center">
+                <input 
+                  value={formData.displayImageUrl || ""} 
+                  placeholder="Paste image link (e.g. from Unsplash or Imgur)"
+                  onChange={e => setFormData({ ...formData, displayImageUrl: e.target.value })}
+                  className="flex-1 bg-background border border-border rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary/50 outline-none transition-all"
+                />
+                {formData.displayImageUrl && (
+                  <div className="w-12 h-12 rounded-lg border border-border overflow-hidden bg-muted">
+                    <img 
+                      src={formData.displayImageUrl} 
+                      alt="Preview" 
+                      className="w-full h-full object-cover" 
+                      onError={(e) => (e.currentTarget.src = 'https://placehold.co/400x400?text=Error')}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

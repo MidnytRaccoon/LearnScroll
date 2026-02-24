@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
 import { X, Trophy, ArrowRight } from "lucide-react";
-import type { ContentItem } from "@shared/routes";
+import type { ContentItem } from "@shared/schema";
 import { useUpdateContent } from "@/hooks/use-content";
 
 interface CompletionModalProps {

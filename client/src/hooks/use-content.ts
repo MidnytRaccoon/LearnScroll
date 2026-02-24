@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, buildUrl, type ContentInput, type ContentUpdateInput, type FeedQueryParams } from "@shared/routes";
+import { api, buildUrl, type ContentInput, type ContentUpdateInput } from "@shared/routes";
+
+type FeedQueryParams = { focus?: string };
 
 // GET /api/content
 export function useFeed(params?: FeedQueryParams) {
@@ -43,6 +45,7 @@ export function useCreateContent() {
 export function useUpdateContent() {
   const queryClient = useQueryClient();
   return useMutation({
+    // It takes an object with id and spreads the rest as updates
     mutationFn: async ({ id, ...updates }: { id: number } & ContentUpdateInput) => {
       const url = buildUrl(api.content.update.path, { id });
       const res = await fetch(url, {
@@ -56,7 +59,7 @@ export function useUpdateContent() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['feed'] });
-      queryClient.invalidateQueries({ queryKey: [api.stats.get.path] }); // Completing updates stats
+      queryClient.invalidateQueries({ queryKey: [api.stats.get.path] });
     },
   });
 }
@@ -109,6 +112,23 @@ export function useDetectUrl() {
       });
       if (!res.ok) throw new Error("Detection failed");
       return res.json();
+    },
+  });
+}
+export function useDeleteContent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id:
+       number) => {
+      const url = buildUrl(api.content.delete.path, { id });
+      const res = await fetch(url, {
+        method: 'DELETE',
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error('Failed to delete content');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
     },
   });
 }
